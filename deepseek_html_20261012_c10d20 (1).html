@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>8灯数字显示 · PLC 实验仿真</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070b16; --panel:#0f172a; --panel2:#16213a; --border:#24344f;
+  --cyan:#22d3ee; --amber:#fbbf24; --red:#f43f5e;
+  --text:#e6edf7; --muted:#8aa0bd;
+}
+body{
+  font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:radial-gradient(1200px 600px at 20% -10%,#132043 0%,var(--bg) 60%);
+  color:var(--text); line-height:1.65; min-height:100vh; padding:30px 16px 60px;
+}
+header{
+  text-align:center; margin-bottom:26px;
+}
+header h1{
+  font-size:1.5rem; letter-spacing:1px;
+  background:linear-gradient(90deg,#22d3ee,#a78bfa,#fbbf24);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+header p{color:var(--muted);font-size:.85rem;margin-top:6px}
+
+.wrap{max-width:960px;margin:0 auto}
+.card{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:14px; padding:22px; margin-bottom:20px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+.card h2{
+  font-size:1.05rem; color:var(--cyan); margin-bottom:18px;
+  padding-bottom:10px; border-bottom:1px dashed var(--border);
+  display:flex; align-items:center; gap:8px;
+}
+
+/* ---------- 输入区 ---------- */
+.io-grid{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:12px;
+}
+@media(max-width:520px){.io-grid{grid-template-columns:repeat(2,1fr)}}
+.pbtn{
+  position:relative; padding:16px 6px 12px; border-radius:12px; cursor:pointer;
+  background:linear-gradient(180deg,#1e2b48,#141d33);
+  border:1px solid #2e4266; text-align:center; user-select:none;
+  transition:transform .08s, box-shadow .15s, border-color .15s;
+  box-shadow:0 4px 0 #0b1220, 0 6px 14px rgba(0,0,0,.5);
+}
+.pbtn:hover{border-color:#3d5a8c}
+.pbtn:active,.pbtn.pressed{
+  transform:translateY(3px);
+  box-shadow:0 1px 0 #0b1220, 0 0 18px rgba(34,211,238,.35);
+  border-color:var(--cyan);
+}
+.pbtn .lbl{font-size:1.05rem;font-weight:700;color:var(--text)}
+.pbtn .addr{font-size:.7rem;color:var(--muted);font-family:ui-monospace,Consolas,monospace;margin-top:3px}
+.pbtn.reset{
+  background:linear-gradient(180deg,#4a1424,#2a0c16); border-color:#7f1d3a;
+  margin-top:12px;
+}
+.pbtn.reset:hover{border-color:var(--red)}
+.pbtn.reset .lbl{color:#fda4af}
+
+/* ---------- 输出区 ---------- */
+.lamps{
+  display:grid; grid-template-columns:repeat(4,1fr); gap:16px;
+}
+@media(max-width:520px){.lamps{grid-template-columns:repeat(2,1fr)}}
+.lamp-box{text-align:center}
+.lamp{
+  width:100%; aspect-ratio:1/1; max-width:90px; margin:0 auto;
+  border-radius:50%;
+  background:radial-gradient(circle at 35% 30%,#2a3a58,#101828 70%);
+  border:3px solid #2a3a58; transition:.18s;
+  box-shadow:inset 0 0 14px rgba(0,0,0,.8);
+}
+.lamp.on{
+  background:radial-gradient(circle at 35% 30%,#fff6c2,#fbbf24 45%,#d97706 100%);
+  border-color:#fde68a;
+  box-shadow:0 0 22px #fbbf24,0 0 46px rgba(251,191,36,.55),
+             inset 0 0 16px rgba(255,255,255,.6);
+}
+.lamp-cap{font-size:.75rem;color:var(--muted);margin-top:8px;
+  font-family:ui-monospace,Consolas,monospace}
+.lamp-cap b{color:var(--text);font-size:.82rem;display:block}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔌 8 灯数字显示 · PLC 实验仿真</h1>
+  <p>西门子 S7-200 SMART / S7-1200　|　单灯互锁 · 保持型输出</p>
+</header>
+
+<div class="wrap">
+
+  <!-- 输入区 -->
+  <div class="card">
+    <h2>🎛️ 输入按钮区</h2>
+    <div class="io-grid" id="btnGrid"></div>
+    <div style="display:flex;justify-content:center">
+      <div class="pbtn reset" id="btnReset" style="width:200px">
+        <div class="lbl">SB0 复位</div>
+        <div class="addr">I1.0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 输出区 -->
+  <div class="card">
+    <h2>💡 输出指示灯区</h2>
+    <div class="lamps" id="lampGrid"></div>
+  </div>
+
+</div>
+
+<script>
+/* ---------- 状态 ---------- */
+const outputs = new Array(8).fill(0);   // Q0.0 ~ Q0.7
+
+/* ---------- 构建按钮区 ---------- */
+const btnGrid = document.getElementById('btnGrid');
+for(let i=1;i<=8;i++){
+  const d = document.createElement('div');
+  d.className = 'pbtn';
+  d.dataset.n = i;
+  d.innerHTML = `<div class="lbl">SB${i}</div><div class="addr">I0.${i-1}</div>`;
+  d.addEventListener('pointerdown', ()=>{ d.classList.add('pressed'); pressButton(i); });
+  d.addEventListener('pointerup',   ()=>  d.classList.remove('pressed'));
+  d.addEventListener('pointerleave',()=>  d.classList.remove('pressed'));
+  btnGrid.appendChild(d);
+}
+
+/* ---------- 复位按钮 ---------- */
+const btnReset = document.getElementById('btnReset');
+btnReset.addEventListener('pointerdown', ()=>{ btnReset.classList.add('pressed'); pressButton(0); });
+btnReset.addEventListener('pointerup',   ()=>  btnReset.classList.remove('pressed'));
+btnReset.addEventListener('pointerleave',()=>  btnReset.classList.remove('pressed'));
+
+/* ---------- 构建灯区 ---------- */
+const lampGrid = document.getElementById('lampGrid');
+for(let i=0;i<8;i++){
+  const box = document.createElement('div');
+  box.className = 'lamp-box';
+  box.innerHTML = `<div class="lamp" id="lamp${i}"></div>
+                   <div class="lamp-cap"><b>HL${i+1}</b>Q0.${i}</div>`;
+  lampGrid.appendChild(box);
+}
+
+/* ---------- 按下按钮逻辑 ---------- */
+function pressButton(n){
+  if(n === 0){
+    // SB0 复位：全部熄灭
+    outputs.fill(0);
+  }else{
+    // 单灯互锁：先全部清零，再置位第 n 位
+    outputs.fill(0);
+    outputs[n-1] = 1;
+  }
+  render();
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  outputs.forEach((v,i)=>{
+    document.getElementById('lamp'+i).classList.toggle('on', v === 1);
+  });
+}
+
+/* ---------- 上电初始化：全部熄灭 ---------- */
+outputs.fill(0);
+render();
+</script>
+
+</body>
+</html>
