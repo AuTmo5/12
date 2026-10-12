@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLC 8灯数字显示实验 · 输入区与输出区</title>
+<style>
+  :root{
+    --bg:#eef1f6; --card:#ffffff; --line:#c9d2e0; --ink:#1f2937; --muted:#64748b;
+    --blue:#123a6b; --blue2:#1d5fa8; --on-soft:#ffe4e6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:0 0 40px; background:var(--bg); color:var(--ink);
+    font-family:"Microsoft YaHei","PingFang SC","Segoe UI",system-ui,sans-serif;
+    font-size:14px; line-height:1.6;
+  }
+
+  /* ---------- 页头 ---------- */
+  .page-head{
+    background:linear-gradient(135deg,#0d2b52,#1b4f86 55%,#0f766e);
+    color:#fff; padding:20px 30px 16px;
+  }
+  .page-head h1{margin:0 0 4px; font-size:21px; letter-spacing:.4px;}
+  .page-head p{margin:0; opacity:.92; font-size:13px;}
+
+  main{max-width:1280px; margin:0 auto; padding:22px 18px;}
+  section.card{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    padding:18px 20px; box-shadow:0 1px 2px rgba(15,23,42,.05);
+  }
+
+  /* ---------- 输入区 + 输出区 ---------- */
+  .sim-wrap{
+    display:grid; grid-template-columns:minmax(280px,340px) minmax(420px,1fr);
+    gap:16px; align-items:start;
+  }
+  @media(max-width:900px){.sim-wrap{grid-template-columns:1fr;}}
+
+  .sim-col{background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px;}
+  .sim-col h4{margin:0 0 10px; font-size:14px; color:var(--blue);}
+
+  .btn-grid{display:grid; grid-template-columns:1fr 1fr; gap:9px;}
+  .pb{
+    position:relative; border:1px solid #b9c6d8; border-radius:10px;
+    background:linear-gradient(#fdfefe,#e8eef7); cursor:pointer; padding:11px 6px 9px;
+    font-family:inherit; font-size:12.5px; color:#233b5c; text-align:center;
+    box-shadow:0 2px 0 #c3cfe0; user-select:none; transition:.08s;
+  }
+  .pb b{display:block; font-size:15px; color:var(--blue);}
+  .pb small{color:var(--muted); font-size:11px;}
+  .pb:active,.pb.down{
+    transform:translateY(2px); box-shadow:0 0 0 #c3cfe0;
+    background:linear-gradient(#dbe7f7,#c9daf1); border-color:#7fa4cf;
+  }
+  .pb.reset{grid-column:span 2; background:linear-gradient(#fff7f7,#fbe3e3); border-color:#e2b0b0; box-shadow:0 2px 0 #e0c0c0;}
+  .pb.reset b{color:#a12d0f;}
+
+  .lamp-row{display:grid; grid-template-columns:repeat(4,1fr); gap:10px;}
+  @media(min-width:1200px){.lamp-row{grid-template-columns:repeat(8,1fr); gap:8px;}}
+  .lamp{
+    text-align:center; background:#f4f7fb; border:1px solid var(--line);
+    border-radius:9px; padding:10px 2px 8px; transition:.15s;
+  }
+  .lamp .bulb{
+    width:30px; height:30px; margin:0 auto 5px; border-radius:50%;
+    background:radial-gradient(circle at 34% 30%,#f2f5f9,#c8d2e0 72%);
+    border:1px solid #b3bfd0; transition:.15s;
+  }
+  .lamp span{font-size:11px; color:var(--muted); font-family:Consolas,monospace;}
+  .lamp.on{background:var(--on-soft); border-color:#f4a3b4; box-shadow:0 0 0 2px #ffe4e6 inset;}
+  .lamp.on .bulb{
+    background:radial-gradient(circle at 34% 30%,#fff6a8,#f43f5e 68%);
+    border-color:#e11d48; box-shadow:0 0 16px #fb7185,0 0 34px rgba(244,63,94,.5);
+  }
+  .lamp.on span{color:#a12d0f; font-weight:700;}
+  .lamp .num{display:block; font-size:14px; color:var(--blue); font-weight:700; font-family:inherit;}
+
+  .stat{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px;}
+  .stat div{background:#f4f7fb; border:1px solid var(--line); border-radius:8px; padding:7px 9px; font-size:12px; color:var(--muted);}
+  .stat b{display:block; font-family:Consolas,monospace; color:var(--blue); font-size:14px;}
+
+  .warn{
+    margin-top:12px; padding:9px 12px; border-radius:8px; font-size:12.5px;
+    background:#fef6e7; border:1px solid #f0d9a8; color:#7c5a10;
+  }
+  .warn.err{background:#fdeaea; border-color:#f2b8b8; color:#8c1c1c; font-weight:600;}
+
+  .sim-tip{color:var(--muted); font-size:12.5px; margin:10px 0 0;}
+  kbd{
+    background:#eef2f8; border:1px solid #c9d2e0; border-bottom-width:2px;
+    border-radius:5px; padding:0 5px; font-family:Consolas,monospace; font-size:11.5px;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-head">
+  <h1>PLC 小灯实验 —— 8 灯数字显示（1~8 互锁点亮）</h1>
+  <p>按下 SBn（对应数字 n）→ 只点亮 HLn，保持到下一个数字或按 SB0 复位。</p>
+</div>
+
+<main>
+  <section class="card">
+    <div class="sim-wrap">
+      <!-- ================= 输入区 ================= -->
+      <div class="sim-col" id="sim-inputs">
+        <h4>输入区 · SB1~SB8 / SB0</h4>
+        <div class="btn-grid" id="btn-grid"></div>
+        <p class="sim-tip">按住按钮表示按下；键盘 <kbd>1</kbd>~<kbd>8</kbd> 对应 SB1~SB8，<kbd>0</kbd> 复位。</p>
+      </div>
+
+      <!-- ================= 输出区 ================= -->
+      <div class="sim-col">
+        <h4>输出区 · 指示灯 HL1~HL8</h4>
+        <div class="lamp-row" id="lamp-row"></div>
+        <div class="stat" style="margin-top:16px">
+          <div>QB0 十进制<b id="qb0-dec">0</b></div>
+          <div>QB0 二进制<b id="qb0-bin">0000 0000</b></div>
+          <div>当前数字<b id="cur-num">—</b></div>
+          <div>点亮灯数<b id="on-count">0</b></div>
+        </div>
+        <div class="warn" id="sim-warn">等待操作：按住左侧按钮试试。</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+/* =========================================================================
+   仿真引擎（与程序 Network 1~N 的执行顺序一致）
+   程序逻辑：上电初始化 → 8 条互锁支路（按 SBn 置位 Qn 并复位其余 7 位）
+             → SB0 复位 → 互锁自检
+   ========================================================================= */
+const N = 8;
+const sim = {
+  inputs: {}, outputs: {}, alarm: false,
+  scan: 0, firstScan: false, lastMs: null, curNum: 0
+};
+for (let i = 0; i < N; i++) { sim.inputs['I0.' + i] = false; sim.outputs['Q0.' + i] = false; }
+sim.inputs['I1.0'] = false;
+
+function outByte() {
+  let b = 0;
+  for (let i = 0; i < N; i++) if (sim.outputs['Q0.' + i]) b |= (1 << i);
+  return b;
+}
+function bitCount(b) { let c = 0; while (b) { c += b & 1; b >>= 1; } return c; }
+
+function scan(live) {
+  const t0 = performance.now();
+  sim.scan++;
+  sim.firstScan = !!live;
+
+  // —— Network 1：上电初始化（仅首次扫描执行） ——
+  if (live) {
+    for (let i = 0; i < N; i++) sim.outputs['Q0.' + i] = false;
+    sim.alarm = false;
+  }
+
+  // —— Network 2~9：互锁点亮（置位自己 + 复位其余 7 位） ——
+  for (let i = 0; i < N; i++) {
+    if (sim.inputs['I0.' + i]) {
+      sim.outputs['Q0.' + i] = true;
+      for (let j = 0; j < N; j++) if (j !== i) sim.outputs['Q0.' + j] = false;
+    }
+  }
+
+  // —— Network 10：复位按钮 SB0 ——
+  if (sim.inputs['I1.0']) {
+    for (let i = 0; i < N; i++) sim.outputs['Q0.' + i] = false;
+    sim.alarm = false;
+  }
+
+  // —— Network 11：互锁自检（≥2 个输出位为 1 时报警） ——
+  const b = outByte();
+  if (bitCount(b) >= 2) sim.alarm = true;
+
+  sim.curNum = 0;
+  for (let i = 0; i < N; i++) if (sim.outputs['Q0.' + i]) sim.curNum = i + 1;
+
+  sim.lastMs = performance.now() - t0;
+}
+
+/* =========================================================================
+   界面刷新
+   ========================================================================= */
+function buildSimUI() {
+  // 输入区按钮
+  const bg = document.getElementById('btn-grid');
+  let h = '';
+  for (let i = 0; i < N; i++) {
+    h += '<button class="pb" data-addr="I0.' + i + '">'
+       + '<b>SB' + (i + 1) + '</b>数字 ' + (i + 1)
+       + '<small>I0.' + i + ' → HL' + (i + 1) + '</small></button>';
+  }
+  h += '<button class="pb reset" data-addr="I1.0"><b>SB0 复位</b>8 灯全灭<small>I1.0</small></button>';
+  bg.innerHTML = h;
+
+  // 输出区灯板
+  const lr = document.getElementById('lamp-row');
+  let hl = '';
+  for (let i = 0; i < N; i++) {
+    hl += '<div class="lamp" data-io="Q0.' + i + '"><div class="bulb"></div>'
+        + '<span class="num">' + (i + 1) + '</span><span>HL' + (i + 1) + '</span></div>';
+  }
+  lr.innerHTML = hl;
+}
+
+let prevState = {};
+
+function refreshUI() {
+  // 按钮按下高亮
+  document.querySelectorAll('#btn-grid .pb').forEach(el => {
+    el.classList.toggle('down', !!sim.inputs[el.dataset.addr]);
+  });
+
+  // 输出指示灯
+  const all = {};
+  for (let i = 0; i < N; i++) all['Q0.' + i] = sim.outputs['Q0.' + i];
+
+  document.querySelectorAll('[data-io]').forEach(el => {
+    const a = el.dataset.io, v = !!all[a];
+    el.classList.toggle('on', v);
+    if (prevState[a] !== undefined && prevState[a] !== v) {
+      el.animate([{ filter: 'brightness(1.5)' }, { filter: 'brightness(1)' }], { duration: 180 });
+    }
+    prevState[a] = v;
+  });
+
+  // 数值显示
+  const b = outByte();
+  document.getElementById('qb0-dec').textContent = b;
+  document.getElementById('qb0-bin').textContent = b.toString(2).padStart(8, '0').replace(/(.{4})(.{4})/, '$1 $2');
+  document.getElementById('cur-num').textContent = sim.curNum ? sim.curNum + '（HL' + sim.curNum + '）' : '—';
+  document.getElementById('on-count').textContent = bitCount(b);
+
+  // 提示条
+  const w = document.getElementById('sim-warn');
+  if (sim.alarm) {
+    w.className = 'warn err';
+    w.textContent = '⚠ 互锁异常：检测到 2 个及以上输出同时为 1（M0.1 = 1），请检查复位支路。';
+  } else if (sim.curNum) {
+    w.className = 'warn';
+    w.innerHTML = '当前显示数字 <b>' + sim.curNum + '</b>，仅 HL' + sim.curNum + ' 点亮，其余输出已复位（M0.1 = 0）。';
+  } else {
+    w.className = 'warn';
+    w.textContent = '8 灯全灭，等待按钮输入。按住左侧任意按钮（或键盘 1~8）进行互锁点亮测试。';
+  }
+}
+
+/* =========================================================================
+   交互事件
+   ========================================================================= */
+function setInput(addr, v) {
+  if (!(addr in sim.inputs)) return;
+  sim.inputs[addr] = v;
+  refreshUI();
+}
+
+function bindEvents() {
+  document.querySelectorAll('#btn-grid .pb').forEach(el => {
+    const addr = el.dataset.addr;
+    const down = e => { e.preventDefault(); setInput(addr, true); };
+    const up = () => { setInput(addr, false); };
+    el.addEventListener('pointerdown', down);
+    el.addEventListener('pointerup', up);
+    el.addEventListener('pointerleave', up);
+    el.addEventListener('pointercancel', up);
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  });
+
+  const keyMap = {};
+  for (let i = 0; i < N; i++) keyMap[String(i + 1)] = 'I0.' + i;
+  keyMap['0'] = 'I1.0';
+  window.addEventListener('keydown', e => {
+    if (e.repeat) return;
+    const a = keyMap[e.key];
+    if (a) { setInput(a, true); e.preventDefault(); }
+  });
+  window.addEventListener('keyup', e => {
+    const a = keyMap[e.key];
+    if (a) { setInput(a, false); e.preventDefault(); }
+  });
+}
+
+/* =========================================================================
+   启动
+   ========================================================================= */
+buildSimUI();
+bindEvents();
+scan(true);          // 首次扫描：执行上电初始化，8 灯全灭
+refreshUI();
+setInterval(() => { scan(false); refreshUI(); }, 50);   // 20 Hz 扫描
+</script>
+</body>
+</html>

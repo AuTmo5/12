@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>8灯数字显示 · PLC 实验仿真与文档</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070b16; --panel:#0f172a; --panel2:#16213a; --border:#24344f;
+  --cyan:#22d3ee; --cyan-dark:#0e7490; --amber:#fbbf24; --red:#f43f5e;
+  --green:#34d399; --text:#e6edf7; --muted:#8aa0bd;
+}
+body{
+  font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+  background:radial-gradient(1200px 600px at 20% -10%,#132043 0%,var(--bg) 60%);
+  color:var(--text); line-height:1.65; min-height:100vh; padding-bottom:60px;
+}
+/* ---------- 顶部 ---------- */
+header{
+  padding:28px 20px 18px; text-align:center;
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg,rgba(34,211,238,.08),transparent);
+}
+header h1{
+  font-size:1.55rem; letter-spacing:1px;
+  background:linear-gradient(90deg,#22d3ee,#a78bfa,#fbbf24);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+header p{color:var(--muted);font-size:.86rem;margin-top:6px}
+/* ---------- Tab ---------- */
+.tabs{
+  display:flex; justify-content:center; gap:10px;
+  padding:18px 12px 0; position:sticky; top:0; z-index:50;
+  background:linear-gradient(180deg,var(--bg) 70%,transparent);
+}
+.tab-btn{
+  padding:10px 26px; border-radius:10px 10px 0 0; cursor:pointer;
+  border:1px solid var(--border); border-bottom:none;
+  background:var(--panel); color:var(--muted);
+  font-size:.92rem; font-weight:600; transition:.2s;
+}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{
+  background:var(--panel2); color:var(--cyan);
+  box-shadow:0 -2px 0 var(--cyan) inset;
+}
+/* ---------- 通用容器 ---------- */
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+.card{
+  background:var(--panel); border:1px solid var(--border);
+  border-radius:14px; padding:20px; margin-bottom:18px;
+  box-shadow:0 10px 30px rgba(0,0,0,.35);
+}
+.card h2{
+  font-size:1.05rem; color:var(--cyan); margin-bottom:14px;
+  padding-bottom:8px; border-bottom:1px dashed var(--border);
+  display:flex; align-items:center; gap:8px;
+}
+.card h3{font-size:.95rem;color:var(--amber);margin:16px 0 8px}
+.hidden{display:none!important}
+
+/* ---------- 仿真：工具栏 ---------- */
+.toolbar{
+  display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+  margin-bottom:16px;
+}
+.seg{display:flex;background:var(--panel2);border-radius:10px;padding:4px;border:1px solid var(--border)}
+.seg button{
+  padding:8px 18px;border:none;background:transparent;color:var(--muted);
+  cursor:pointer;border-radius:7px;font-size:.85rem;font-weight:600;transition:.2s;
+}
+.seg button.on{background:var(--cyan);color:#062028;box-shadow:0 0 14px rgba(34,211,238,.5)}
+.btn-act{
+  padding:9px 20px;border-radius:9px;border:1px solid var(--border);
+  background:var(--panel2);color:var(--text);cursor:pointer;
+  font-size:.85rem;font-weight:600;transition:.2s;
+}
+.btn-act:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* ---------- 仿真：按钮区 ---------- */
+.io-grid{
+  display:grid; grid-template-columns:repeat(8,1fr); gap:10px; margin-bottom:8px;
+}
+@media(max-width:760px){.io-grid{grid-template-columns:repeat(4,1fr)}}
+.pbtn{
+  position:relative; padding:14px 4px 10px; border-radius:11px; cursor:pointer;
+  background:linear-gradient(180deg,#1e2b48,#141d33);
+  border:1px solid #2e4266; text-align:center; user-select:none;
+  transition:transform .08s, box-shadow .15s, border-color .15s;
+  box-shadow:0 4px 0 #0b1220, 0 6px 14px rgba(0,0,0,.5);
+}
+.pbtn:hover{border-color:#3d5a8c}
+.pbtn:active,.pbtn.pressed{
+  transform:translateY(3px); box-shadow:0 1px 0 #0b1220, 0 0 18px rgba(34,211,238,.35);
+  border-color:var(--cyan);
+}
+.pbtn .lbl{font-size:1rem;font-weight:700;color:var(--text)}
+.pbtn .addr{font-size:.68rem;color:var(--muted);font-family:ui-monospace,Consolas,monospace;margin-top:2px}
+.pbtn.reset{
+  background:linear-gradient(180deg,#4a1424,#2a0c16); border-color:#7f1d3a;
+}
+.pbtn.reset:hover{border-color:var(--red)}
+.pbtn.reset .lbl{color:#fda4af}
+
+/* ---------- 仿真：灯区 ---------- */
+.lamps{
+  display:grid; grid-template-columns:repeat(8,1fr); gap:12px; margin-top:6px;
+}
+@media(max-width:760px){.lamps{grid-template-columns:repeat(4,1fr)}}
+.lamp-box{text-align:center}
+.lamp{
+  width:100%; aspect-ratio:1/1; max-width:74px; margin:0 auto;
+  border-radius:50%; background:radial-gradient(circle at 35% 30%,#2a3a58,#101828 70%);
+  border:3px solid #2a3a58; transition:.18s;
+  box-shadow:inset 0 0 14px rgba(0,0,0,.8);
+}
+.lamp.on{
+  background:radial-gradient(circle at 35% 30%,#fff6c2,#fbbf24 45%,#d97706 100%);
+  border-color:#fde68a;
+  box-shadow:0 0 22px #fbbf24,0 0 46px rgba(251,191,36,.55),inset 0 0 16px rgba(255,255,255,.6);
+}
+.lamp-cap{font-size:.72rem;color:var(--muted);margin-top:7px;font-family:ui-monospace,Consolas,monospace}
+.lamp-cap b{color:var(--text);font-size:.78rem}
+
+/* ---------- 仿真：状态监控 ---------- */
+.monitor{
+  display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:12px; margin-top:4px;
+}
+.mbox{
+  background:var(--panel2); border:1px solid var(--border);
+  border-radius:10px; padding:12px;
+}
+.mbox .k{font-size:.72rem;color:var(--muted);letter-spacing:.5px}
+.mbox .v{
+  font-family:ui-monospace,Consolas,monospace; font-size:1.15rem;
+  color:var(--cyan); font-weight:700; margin-top:4px; word-break:break-all;
+}
+.bits{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.bit{
+  width:34px;height:34px;border-radius:8px;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;font-size:.6rem;
+  background:#0c1526;border:1px solid var(--border);color:#4a5f80;
+  font-family:ui-monospace,monospace;transition:.15s;
+}
+.bit b{font-size:.72rem;line-height:1}
+.bit.on{background:rgba(251,191,36,.15);border-color:var(--amber);color:var(--amber);box-shadow:0 0 10px rgba(251,191,36,.35)}
+
+/* ---------- 仿真：梯形图监视 ---------- */
+.ladder-scroll{
+  max-height:400px; overflow-y:auto; padding-right:6px;
+  border:1px solid var(--border); border-radius:10px; background:#0a1120;
+}
+.ladder-scroll::-webkit-scrollbar{width:8px}
+.ladder-scroll::-webkit-scrollbar-thumb{background:#24344f;border-radius:4px}
+.net{
+  padding:10px 14px; border-bottom:1px solid #16223a; transition:.2s;
+  border-left:3px solid transparent;
+}
+.net:last-child{border-bottom:none}
+.net.active{
+  background:rgba(34,211,238,.09); border-left-color:var(--cyan);
+  box-shadow:inset 0 0 24px rgba(34,211,238,.07);
+}
+.net-title{font-size:.76rem;color:var(--muted);margin-bottom:6px;font-weight:600}
+.net.active .net-title{color:var(--cyan)}
+.net pre{
+  font-family:ui-monospace,"Cascadia Code",Consolas,monospace;
+  font-size:.78rem; line-height:1.5; color:#9fb4d4; white-space:pre; overflow-x:auto;
+}
+.net.active pre{color:#cffafe}
+.hl{color:var(--amber);font-weight:700}
+
+/* ---------- 文档样式 ---------- */
+.doc h2{
+  font-size:1.15rem;color:var(--cyan);margin:26px 0 12px;
+  padding-left:12px;border-left:4px solid var(--cyan);
+  border-bottom:none;display:block;
+}
+.doc h3{font-size:1rem;color:var(--amber);margin:18px 0 10px}
+.doc h4{font-size:.9rem;color:#c4b5fd;margin:14px 0 8px}
+.doc p{margin:8px 0;font-size:.9rem;color:#c7d5e8}
+.doc ul,.doc ol{margin:8px 0 8px 22px;font-size:.9rem;color:#c7d5e8}
+.doc li{margin:4px 0}
+.doc table{
+  width:100%;border-collapse:collapse;margin:12px 0;font-size:.83rem;
+  background:var(--panel2);border-radius:8px;overflow:hidden;
+}
+.doc th{
+  background:#1c2942;color:var(--cyan);padding:9px 10px;text-align:left;
+  font-weight:600;border:1px solid var(--border);white-space:nowrap;
+}
+.doc td{padding:8px 10px;border:1px solid var(--border);color:#c7d5e8;vertical-align:top}
+.doc tr:hover td{background:rgba(34,211,238,.04)}
+.doc pre{
+  background:#0a1120;border:1px solid var(--border);border-radius:9px;
+  padding:14px;overflow-x:auto;margin:10px 0;
+  font-family:ui-monospace,"Cascadia Code",Consolas,monospace;
+  font-size:.8rem;line-height:1.6;color:#a5c8e8;
+}
+.doc code{
+  font-family:ui-monospace,Consolas,monospace;font-size:.84em;
+  background:#1a2540;padding:2px 6px;border-radius:5px;color:#7dd3fc;
+}
+.doc pre code{background:none;padding:0;color:inherit}
+.tip{
+  background:rgba(34,211,238,.08);border-left:3px solid var(--cyan);
+  padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:.85rem;color:#a5d8e8;
+}
+.warn{
+  background:rgba(244,63,94,.08);border-left:3px solid var(--red);
+  padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:.85rem;color:#fda4af;
+}
+.flow{
+  background:#0a1120;border:1px solid var(--border);border-radius:9px;
+  padding:16px;font-family:ui-monospace,Consolas,monospace;
+  font-size:.78rem;line-height:1.7;color:#9fb4d4;overflow-x:auto;white-space:pre;
+}
+/* 测试表输入框 */
+.doc input[type=text]{
+  width:100%;background:#0a1120;border:1px solid var(--border);border-radius:6px;
+  padding:5px 8px;color:var(--text);font-size:.82rem;font-family:inherit;
+}
+.doc input[type=text]:focus{outline:none;border-color:var(--cyan)}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔌 8 灯数字显示 · PLC 实验仿真与说明文档</h1>
+  <p>西门子 S7-200 SMART / S7-1200　|　梯形图 LAD + STL/SCL 对照　|　可交互仿真</p>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="sim">🎮 交互仿真</button>
+  <button class="tab-btn" data-tab="doc">📋 实验文档</button>
+</div>
+
+<!-- ============================================================ -->
+<!-- ======================= 仿真页 ============================= -->
+<!-- ============================================================ -->
+<div class="wrap" id="tab-sim" style="padding-top:18px">
+
+  <div class="card">
+    <h2>⚙️ 控制面板</h2>
+    <div class="toolbar">
+      <div class="seg" id="modeSeg">
+        <button class="on" data-mode="A">方案 A · 逐位互锁法</button>
+        <button data-mode="B">方案 B · 数据传送法</button>
+      </div>
+      <button class="btn-act" id="powerReset">🔌 上电复位（SM0.1）</button>
+      <button class="btn-act" id="clearLog">🧹 清空记录</button>
+    </div>
+    <div class="monitor">
+      <div class="mbox"><div class="k">运行状态</div><div class="v" id="runState" style="color:var(--green)">RUN</div></div>
+      <div class="mbox"><div class="k">当前方案</div><div class="v" id="modeText">方案 A</div></div>
+      <div class="mbox"><div class="k">最近动作</div><div class="v" id="lastAction" style="font-size:.9rem;color:var(--muted)">—</div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🎛️ 输入按钮区（I0.0 ~ I0.7 / I1.0）</h2>
+    <div class="io-grid" id="btnGrid"></div>
+    <div style="display:flex;justify-content:center;margin-top:10px">
+      <div class="pbtn reset" id="btnReset" style="width:180px">
+        <div class="lbl">SB0 复位</div>
+        <div class="addr">I1.0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>💡 输出指示灯区（Q0.0 ~ Q0.7）</h2>
+    <div class="lamps" id="lampGrid"></div>
+  </div>
+
+  <div class="card">
+    <h2>📊 状态监控</h2>
+    <div class="monitor">
+      <div class="mbox">
+        <div class="k">QB0 字节值</div>
+        <div class="v" id="qbVal">0</div>
+        <div class="k" style="margin-top:6px">二进制</div>
+        <div class="v" id="qbBin" style="font-size:1rem">0000 0000</div>
+      </div>
+      <div class="mbox" style="grid-column:span 2">
+        <div class="k">Q0.7 ← Q0.0 位状态</div>
+        <div class="bits" id="bitRow"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>📺 梯形图执行监视（当前激活网络高亮）</h2>
+    <div class="ladder-scroll" id="ladderList"></div>
+    <p style="font-size:.75rem;color:var(--muted);margin-top:10px">
+      提示：点击任意按钮，可看到对应 Network 被点亮高亮，模拟 PLC 扫描执行过程。
+    </p>
+  </div>
+
+</div>
+
+<!-- ============================================================ -->
+<!-- ======================= 文档页 ============================= -->
+<!-- ============================================================ -->
+<div class="wrap doc hidden" id="tab-doc" style="padding-top:18px">
+
+  <div class="card">
+    <div class="tip">
+      <b>编程平台：</b>STEP 7-Micro/WIN SMART V2.8（S7-200 SMART CPU ST20）<br>
+      <b>假设条件：</b>按钮为自复位常开型（带硬件RC滤波）；指示灯为 24VDC LED（≤20mA）；CPU 为 ST20 晶体管输出，公共端接 0V；若使用 SR20 继电器输出，可接 24VDC 或 220VAC 负载。
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>一、实验目的</h2>
+    <ol>
+      <li>掌握西门子 S7-200 SMART 位逻辑指令（S / R 置位复位、= 输出线圈）的使用方法。</li>
+      <li>理解"单灯互锁"控制逻辑的两种实现思路——逐位互锁法与数据传送法。</li>
+      <li>掌握字节传送指令（MOV_B）在批量输出控制中的应用。</li>
+      <li>学会使用符号表（Symbol Table）规范编程，提高程序可读性。</li>
+      <li>掌握上电初始化（首次扫描位 SM0.1）的编程方法，避免上电随机输出。</li>
+      <li>培养调试与排错能力，能够识别并解决双线圈冲突、输出公共端接线错误等常见问题。</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <h2>二、实验设备与器材清单</h2>
+    <table>
+      <tr><th>序号</th><th>名称</th><th>型号/规格</th><th>数量</th><th>备注</th></tr>
+      <tr><td>1</td><td>PLC 主机</td><td>S7-200 SMART CPU ST20（DC/DC/DC）</td><td>1 台</td><td>替代：SR20（AC/DC/Relay）</td></tr>
+      <tr><td>2</td><td>编程软件</td><td>STEP 7-Micro/WIN SMART V2.8</td><td>1 套</td><td>或 TIA Portal V17+（S7-1200）</td></tr>
+      <tr><td>3</td><td>编程电缆</td><td>以太网线 / USB-PPI</td><td>1 根</td><td>SMART 支持以太网下载</td></tr>
+      <tr><td>4</td><td>按钮开关</td><td>自复位常开按钮</td><td>9 个</td><td>SB0 ~ SB8</td></tr>
+      <tr><td>5</td><td>指示灯</td><td>24VDC LED（≤20mA）</td><td>8 个</td><td>HL1 ~ HL8</td></tr>
+      <tr><td>6</td><td>开关电源</td><td>DC 24V / 2A</td><td>1 台</td><td>为 PLC 与指示灯供电</td></tr>
+      <tr><td>7</td><td>导线</td><td>0.75mm² 多股铜芯线</td><td>若干</td><td>红/黑/蓝三色区分</td></tr>
+      <tr><td>8</td><td>万用表</td><td>数字万用表</td><td>1 台</td><td>排查接线与电压</td></tr>
+      <tr><td>9</td><td>螺丝刀</td><td>十字 / 一字</td><td>各 1 把</td><td>—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>三、I/O 分配表</h2>
+    <table>
+      <tr><th>地址</th><th>符号名</th><th>数据类型</th><th>说明</th></tr>
+      <tr><td>I0.0</td><td>SB1</td><td>BOOL</td><td>数字 1 输入按钮，常开触点</td></tr>
+      <tr><td>I0.1</td><td>SB2</td><td>BOOL</td><td>数字 2 输入按钮，常开触点</td></tr>
+      <tr><td>I0.2</td><td>SB3</td><td>BOOL</td><td>数字 3 输入按钮，常开触点</td></tr>
+      <tr><td>I0.3</td><td>SB4</td><td>BOOL</td><td>数字 4 输入按钮，常开触点</td></tr>
+      <tr><td>I0.4</td><td>SB5</td><td>BOOL</td><td>数字 5 输入按钮，常开触点</td></tr>
+      <tr><td>I0.5</td><td>SB6</td><td>BOOL</td><td>数字 6 输入按钮，常开触点</td></tr>
+      <tr><td>I0.6</td><td>SB7</td><td>BOOL</td><td>数字 7 输入按钮，常开触点</td></tr>
+      <tr><td>I0.7</td><td>SB8</td><td>BOOL</td><td>数字 8 输入按钮，常开触点</td></tr>
+      <tr><td>I1.0</td><td>SB0</td><td>BOOL</td><td>复位按钮，常开触点</td></tr>
+      <tr><td>Q0.0</td><td>HL1</td><td>BOOL</td><td>数字 1 指示灯</td></tr>
+      <tr><td>Q0.1</td><td>HL2</td><td>BOOL</td><td>数字 2 指示灯</td></tr>
+      <tr><td>Q0.2</td><td>HL3</td><td>BOOL</td><td>数字 3 指示灯</td></tr>
+      <tr><td>Q0.3</td><td>HL4</td><td>BOOL</td><td>数字 4 指示灯</td></tr>
+      <tr><td>Q0.4</td><td>HL5</td><td>BOOL</td><td>数字 5 指示灯</td></tr>
+      <tr><td>Q0.5</td><td>HL6</td><td>BOOL</td><td>数字 6 指示灯</td></tr>
+      <tr><td>Q0.6</td><td>HL7</td><td>BOOL</td><td>数字 7 指示灯</td></tr>
+      <tr><td>Q0.7</td><td>HL8</td><td>BOOL</td><td>数字 8 指示灯</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>四、控制流程图</h2>
+    <div class="flow">┌─────────────────────────────────┐
+│         上电 / PLC 进入 RUN      │
+└───────────────┬─────────────────┘
+                ▼
+┌─────────────────────────────────┐
+│  初始化：SM0.1 首次扫描          │
+│  复位 QB0 = 0（8 灯全灭）        │
+└───────────────┬─────────────────┘
+                ▼
+┌─────────────────────────────────┐
+│         等待按钮输入             │
+└───────┬─────────────┬───────────┘
+        │             │
+   SB0 按下       SBn 按下 (n=1~8)
+        │             │
+        ▼             ▼
+┌──────────────┐ ┌──────────────────────┐
+│ QB0 = 0      │ │ 互锁逻辑：           │
+│ 8 灯全灭     │ │ 先复位其余 7 位      │
+│              │ │ 再置位第 n 位        │
+└──────┬───────┘ └──────────┬───────────┘
+       │                    │
+       ▼                    ▼
+┌─────────────────────────────────┐
+│  输出刷新：Q0.0~Q0.7 → 指示灯   │
+│  仅对应数字的灯亮，其余灭        │
+└───────────────┬─────────────────┘
+                ▼
+        返回"等待按钮输入"</div>
+    <p>程序采用循环扫描方式，每个扫描周期依次检测 I0.0~I0.7 与 I1.0。检测到按钮按下时执行对应互锁输出逻辑；无按钮按下时保持当前输出（S/R 指令具有锁存功能）。</p>
+  </div>
+
+  <div class="card">
+    <h2>五、梯形图程序设计</h2>
+
+    <h3>方案 A：逐位互锁法</h3>
+    <p><b>设计思路：</b>每个输入按钮对应一个输出支路。按下 SBn 时，先用 RST 指令复位所有其他输出位，再用 SET 指令置位第 n 个输出位。S/R 指令具有锁存保持功能，按钮松开后输出状态保持不变。</p>
+
+    <h4>Network 1：上电初始化</h4>
+    <pre>  SM0.1
+──┤ ├────────────────────[ R  QB0, 8 ]
+                       复位 QB0 起 8 位</pre>
+    <p><code>SM0.1</code> 为首次扫描标志，PLC 上电进入 RUN 后第一个扫描周期为 ON。R 指令将 QB0 起的 8 个位全部清零，确保上电时 8 灯全灭。</p>
+
+    <h4>Network 2：按下 SB1 → 仅 HL1 亮</h4>
+    <pre>  I0.0
+──┤ ├──────┬────────────[ R  QB0, 8 ]
+           │            复位全部 8 位
+           └────────────[ S  Q0.0, 1 ]
+                        置位 HL1</pre>
+
+    <h4>Network 3 ~ Network 9：SB2 ~ SB8 同理</h4>
+    <pre>  I0.1
+──┤ ├──────┬────────────[ R  QB0, 8 ]
+           └────────────[ S  Q0.1, 1 ]   // HL2
+
+  I0.2
+──┤ ├──────┬────────────[ R  QB0, 8 ]
+           └────────────[ S  Q0.2, 1 ]   // HL3
+
+  ...（SB4 ~ SB7 依此类推）
+
+  I0.7
+──┤ ├──────┬────────────[ R  QB0, 8 ]
+           └────────────[ S  Q0.7, 1 ]   // HL8</pre>
+
+    <h4>Network 10：按下 SB0 → 全部熄灭</h4>
+    <pre>  I1.0
+──┤ ├────────────────────[ R  QB0, 8 ]
+                       复位全部 8 个输出位</pre>
+
+    <div class="tip"><b>关键截图说明位置：</b>Network 1 应显示 SM0.1 常开触点后接 R(QB0, 8)；Network 2 应显示 I0.0 后分支为两路——上路 R(QB0, 8)、下路 S(Q0.0, 1)。在线监控时在状态表中监控 Q0.0~Q0.7，按 SB3 应仅 Q0.2=1。</div>
+
+    <h3>方案 B：数据传送法</h3>
+    <p><b>设计思路：</b>8 个输出位对应 QB0 字节的 8 个位。数字 1~8 分别对应十进制值 1、2、4、8、16、32、64、128（即 2<sup>n-1</sup>）。按下 SBn 时用 MOV_B 将对应数值写入 QB0，一次性设定所有 8 位状态。例如写入 2（0000_0010）则 Q0.1=1，其余为 0，HL2 亮。</p>
+
+    <h4>Network 1：上电初始化</h4>
+    <pre>  SM0.1
+──┤ ├────────────────────[ MOV_B ]
+                       IN  : 0
+                       OUT : QB0</pre>
+
+    <h4>Network 2 ~ Network 9：SB1 ~ SB8 写入对应数值</h4>
+    <pre>  I0.0
+──┤ ├────────────────────[ MOV_B ]   IN: 1    → HL1
+
+  I0.1
+──┤ ├────────────────────[ MOV_B ]   IN: 2    → HL2
+
+  I0.2
+──┤ ├────────────────────[ MOV_B ]   IN: 4    → HL3
+
+  I0.3
+──┤ ├────────────────────[ MOV_B ]   IN: 8    → HL4
+
+  I0.4
+──┤ ├────────────────────[ MOV_B ]   IN: 16   → HL5
+
+  I0.5
+──┤ ├────────────────────[ MOV_B ]   IN: 32   → HL6
+
+  I0.6
+──┤ ├────────────────────[ MOV_B ]   IN: 64   → HL7
+
+  I0.7
+──┤ ├────────────────────[ MOV_B ]   IN: 128  → HL8</pre>
+
+    <h4>Network 10：SB0 复位</h4>
+    <pre>  I1.0
+──┤ ├────────────────────[ MOV_B ]   IN: 0    OUT: QB0</pre>
+
+    <h4>数值对照表</h4>
+    <table>
+      <tr><th>按钮</th><th>数字</th><th>写入 QB0</th><th>二进制（Q0.7~Q0.0）</th><th>亮灯</th></tr>
+      <tr><td>SB1</td><td>1</td><td>1</td><td>0000 0001</td><td>HL1</td></tr>
+      <tr><td>SB2</td><td>2</td><td>2</td><td>0000 0010</td><td>HL2</td></tr>
+      <tr><td>SB3</td><td>3</td><td>4</td><td>0000 0100</td><td>HL3</td></tr>
+      <tr><td>SB4</td><td>4</td><td>8</td><td>0000 1000</td><td>HL4</td></tr>
+      <tr><td>SB5</td><td>5</td><td>16</td><td>0001 0000</td><td>HL5</td></tr>
+      <tr><td>SB6</td><td>6</td><td>32</td><td>0010 0000</td><td>HL6</td></tr>
+      <tr><td>SB7</td><td>7</td><td>64</td><td>0100 0000</td><td>HL7</td></tr>
+      <tr><td>SB8</td><td>8</td><td>128</td><td>1000 0000</td><td>HL8</td></tr>
+    </table>
+
+    <h3>方案对比</h3>
+    <table>
+      <tr><th>对比项</th><th>方案 A：逐位互锁法</th><th>方案 B：数据传送法</th></tr>
+      <tr><td>核心指令</td><td>S（置位）、R（复位）</td><td>MOV_B（字节传送）</td></tr>
+      <tr><td>程序长度</td><td>较长（每按钮 2 条指令）</td><td>较短（每按钮 1 条指令）</td></tr>
+      <tr><td>可读性</td><td>直观，适合理解互锁概念</td><td>需理解二进制编码，稍抽象</td></tr>
+      <tr><td>执行效率</td><td>略低</td><td>较高</td></tr>
+      <tr><td>扩展性</td><td>增加输出需逐一添加网络</td><td>可配合索引/指针批量处理</td></tr>
+      <tr><td>双线圈风险</td><td>低（S/R 不构成双线圈）</td><td>低（MOV_B 写整个字节）</td></tr>
+      <tr><td>调试难度</td><td>容易，可在线观察 S/R 状态</td><td>需理解字节与位的关系</td></tr>
+      <tr><td>推荐场景</td><td>教学演示、逻辑理解</td><td>实际工程、多输出批量控制</td></tr>
+    </table>
+    <div class="tip"><b>建议：</b>初学者先用方案 A 理解互锁逻辑，熟练后使用方案 B 提高编程效率。</div>
+
+    <h3>S7-1200（TIA Portal）操作差异</h3>
+    <table>
+      <tr><th>操作项</th><th>S7-200 SMART</th><th>S7-1200</th></tr>
+      <tr><td>编程软件</td><td>STEP 7-Micro/WIN SMART</td><td>TIA Portal V17+</td></tr>
+      <tr><td>首次扫描位</td><td>SM0.1</td><td>OB100 启动组织块，或用 M 区标志位</td></tr>
+      <tr><td>复位指令</td><td>R QB0, 8</td><td>RESET_BF / R 指令对位域复位</td></tr>
+      <tr><td>字节传送</td><td>MOV_B</td><td>MOVE（支持 BYTE/WORD 等类型）</td></tr>
+      <tr><td>编程语言</td><td>LAD / FBD / STL</td><td>LAD / FBD / SCL（<b>不支持 STL</b>）</td></tr>
+      <tr><td>立即输出</td><td>=I 立即指令</td><td>Q 地址加 ":P" 后缀，如 QB0:P</td></tr>
+      <tr><td>符号表</td><td>符号表编辑器</td><td>PLC 变量表（PLC Tags）</td></tr>
+    </table>
+    <div class="warn"><b>重要提醒：</b>S7-1200 不再支持 STL 语句表编程，梯形图也无法转换为 STL。若需在 TIA Portal 中编写文本代码，请使用 SCL 语言。</div>
+  </div>
+
+  <div class="card">
+    <h2>六、指令表 / SCL 对照代码</h2>
+
+    <h3>6.1 方案 A 的 STL 代码（S7-200 SMART）</h3>
+    <pre>// Network 1：上电初始化
+LD     SM0.1
+R      QB0, 8          // 复位 QB0 起 8 个位
+
+// Network 2：SB1 按下 → 仅 HL1 亮
+LD     I0.0
+R      QB0, 8          // 先复位全部
+S      Q0.0, 1         // 再置位 HL1
+
+// Network 3：SB2 按下 → 仅 HL2 亮
+LD     I0.1
+R      QB0, 8
+S      Q0.1, 1
+
+// Network 4：SB3 按下 → 仅 HL3 亮
+LD     I0.2
+R      QB0, 8
+S      Q0.2, 1
+
+// Network 5：SB4 按下 → 仅 HL4 亮
+LD     I0.3
+R      QB0, 8
+S      Q0.3, 1
+
+// Network 6：SB5 按下 → 仅 HL5 亮
+LD     I0.4
+R      QB0, 8
+S      Q0.4, 1
+
+// Network 7：SB6 按下 → 仅 HL6 亮
+LD     I0.5
+R      QB0, 8
+S      Q0.5, 1
+
+// Network 8：SB7 按下 → 仅 HL7 亮
+LD     I0.6
+R      QB0, 8
+S      Q0.6, 1
+
+// Network 9：SB8 按下 → 仅 HL8 亮
+LD     I0.7
+R      QB0, 8
+S      Q0.7, 1
+
+// Network 10：SB0 复位 → 全部熄灭
+LD     I1.0
+R      QB0, 8</pre>
+
+    <h3>6.2 方案 B 的 STL 代码（S7-200 SMART）</h3>
+    <pre>// Network 1：上电初始化
+LD     SM0.1
+MOVB   0, QB0          // QB0 写 0，8 灯全灭
+
+// Network 2~9：SB1~SB8 → 写入对应数值
+LD     I0.0
+MOVB   1, QB0          // 2^0 = 1    → HL1
+
+LD     I0.1
+MOVB   2, QB0          // 2^1 = 2    → HL2
+
+LD     I0.2
+MOVB   4, QB0          // 2^2 = 4    → HL3
+
+LD     I0.3
+MOVB   8, QB0          // 2^3 = 8    → HL4
+
+LD     I0.4
+MOVB   16, QB0         // 2^4 = 16   → HL5
+
+LD     I0.5
+MOVB   32, QB0         // 2^5 = 32   → HL6
+
+LD     I0.6
+MOVB   64, QB0         // 2^6 = 64   → HL7
+
+LD     I0.7
+MOVB   128, QB0        // 2^7 = 128  → HL8
+
+// Network 10：SB0 复位
+LD     I1.0
+MOVB   0, QB0</pre>
+
+    <h3>6.3 方案 B 的 SCL 代码（S7-1200 适用）</h3>
+    <pre>// ============================================
+// 8 灯数字显示 - SCL 数据传送法（S7-1200）
+// 在 OB1 中编写，或封装为 FC
+// ============================================
+
+// --- 上电初始化（在 OB100 中编写）---
+// "QB0" := 0;   // 上电时所有输出清零
+
+// --- 主程序逻辑（在 OB1 中编写）---
+IF "SB1" THEN
+    "QB0" := 1;      // 0000_0001 → HL1
+ELSIF "SB2" THEN
+    "QB0" := 2;      // 0000_0010 → HL2
+ELSIF "SB3" THEN
+    "QB0" := 4;      // 0000_0100 → HL3
+ELSIF "SB4" THEN
+    "QB0" := 8;      // 0000_1000 → HL4
+ELSIF "SB5" THEN
+    "QB0" := 16;     // 0001_0000 → HL5
+ELSIF "SB6" THEN
+    "QB0" := 32;     // 0010_0000 → HL6
+ELSIF "SB7" THEN
+    "QB0" := 64;     // 0100_0000 → HL7
+ELSIF "SB8" THEN
+    "QB0" := 128;    // 1000_0000 → HL8
+ELSIF "SB0" THEN
+    "QB0" := 0;      // 全部熄灭
+END_IF;</pre>
+    <div class="tip"><b>SCL 说明：</b>S7-1200 的 SCL 中 <code>"QB0"</code> 可直接按字节赋值。多个 IF/ELSIF 条件同时为真时，只有第一个满足的分支被执行（优先级从高到低），天然实现了互锁。若需更严格的互锁保证，可使用 CASE 语句。</div>
+  </div>
+
+  <div class="card">
+    <h2>七、调试步骤与排错指南</h2>
+
+    <h3>7.1 调试步骤</h3>
+    <p><b>第一步：离线检查</b></p>
+    <ol>
+      <li>检查梯形图程序是否有语法错误（Micro/WIN SMART 编译时会自动提示）。</li>
+      <li>确认符号表已正确建立，所有地址与符号的对应关系无误。</li>
+      <li>检查是否存在双线圈冲突（同一 Q 点被多个线圈驱动）。</li>
+    </ol>
+    <p><b>第二步：接线检查（断电状态）</b></p>
+    <ol>
+      <li>用万用表通断档检查按钮接线：SB1~SB8 一端接 I0.0~I0.7，另一端接 1M（输入公共端）。</li>
+      <li>SB0 一端接 I1.0，另一端接 1M。</li>
+      <li>HL1~HL8 一端接 Q0.0~Q0.7，另一端接 24V DC（或 0V，取决于输出类型）。</li>
+      <li>确认 PLC 输出公共端（1L/2L 等）已接对应电源。</li>
+    </ol>
+    <p><b>第三步：下载程序</b></p>
+    <ol>
+      <li>使用以太网线或 USB/PPI 电缆连接 PLC 与电脑。</li>
+      <li>在 Micro/WIN SMART 中设置通信接口，搜索 CPU。</li>
+      <li>将程序下载到 PLC，将 CPU 切换到 RUN 模式。</li>
+    </ol>
+    <p><b>第四步：在线测试</b></p>
+    <ol>
+      <li>打开状态表（Status Chart），添加 Q0.0~Q0.7 监控。</li>
+      <li>依次按下 SB1~SB8，观察对应灯是否点亮。</li>
+      <li>在 HL 亮时按其他按钮，验证互锁功能。</li>
+      <li>按 SB0 验证全部复位。</li>
+    </ol>
+
+    <h3>7.2 常见故障与解决方案</h3>
+    <table>
+      <tr><th>故障现象</th><th>可能原因</th><th>解决方案</th></tr>
+      <tr><td>上电后部分灯随机点亮</td><td>未做上电初始化</td><td>添加 SM0.1 首次扫描复位逻辑</td></tr>
+      <tr><td>按 SBn 后灯不亮</td><td>输出公共端未接线；指示灯极性接反</td><td>检查 1L/2L 公共端电压；LED 正负极</td></tr>
+      <tr><td>按 SBn 后多个灯同时亮</td><td>互锁逻辑遗漏；QB0 被部分写入</td><td>检查每个网络是否有 R 指令；确认无其他程序写 QB0</td></tr>
+      <tr><td>按钮松开后灯熄灭（不保持）</td><td>误用 = 输出线圈代替 S 指令</td><td>将 = Q0.n 改为 S Q0.n, 1</td></tr>
+      <tr><td>程序下载后 PLC 报错</td><td>双线圈冲突</td><td>改用 S/R 指令或 MOV_B 整体写入</td></tr>
+      <tr><td>按 SB0 无法熄灭全部灯</td><td>R 指令位数设置错误</td><td>确认 R QB0, 8 的 N 值为 8</td></tr>
+      <tr><td>ST20 输出端接灯后灯不亮</td><td>晶体管输出为源型，公共端需接 0V</td><td>确认 M 端接 0V 而非 24V</td></tr>
+      <tr><td>指示灯亮度不足</td><td>输出电流超过晶体管额定值</td><td>ST20 每点额定 0.5A，确认灯电流 ≤ 0.5A</td></tr>
+      <tr><td>按钮按下后灯闪烁</td><td>按钮抖动或输出频率过高</td><td>启用输入滤波（默认 6.4ms）</td></tr>
+    </table>
+
+    <h3>7.3 重点排错：双线圈冲突</h3>
+    <p>在梯形图编程中，<b>同一 Q 点在程序中只能出现一次输出线圈（ ）</b>。如果同一 Q 点被两个或以上的线圈驱动，只有最后一个线圈的状态有效，前面的输出会被覆盖。</p>
+    <p><b>本实验中的双线圈风险：</b></p>
+    <ul>
+      <li>方案 B 中，若同时在 Network 1 和 Network 3 中对 QB0 使用 MOV_B，程序可正常运行（MOV_B 写整个字节，不构成位双线圈）。但若某处用 <code>= Q0.0</code>，另一处用 <code>MOVB</code> 写入 QB0，则 MOVB 会覆盖 <code>= Q0.0</code> 的状态。</li>
+      <li>方案 A 中，S/R 指令不构成双线圈问题，因为 S 和 R 是置位/复位操作，不是输出线圈。</li>
+    </ul>
+    <p><b>避免双线圈的方法：</b></p>
+    <ol>
+      <li>优先使用 S/R 指令或字节传送指令。</li>
+      <li>如果必须用输出线圈，确保同一 Q 点在程序中只出现一次。</li>
+      <li>使用中间变量（M）进行逻辑运算，最后统一输出。</li>
+    </ol>
+
+    <h3>7.4 重点排错：QB0 整体写入与位操作的冲突</h3>
+    <p>当程序中同时存在对 QB0 的字节写入（如 MOV_B）和对 Q0.n 的位操作（如 S Q0.0, 1）时，需要注意执行顺序：</p>
+    <ul>
+      <li><b>MOV_B 在后：</b>会覆盖之前所有位操作的结果。</li>
+      <li><b>位操作在后：</b>只修改对应位，不影响其他位。</li>
+    </ul>
+    <div class="warn"><b>建议：</b>同一程序中不要混用字节写入和位写入来驱动同一组输出。如必须混用，确保位操作在字节写入之后执行，且只用于需要单独调整的位。使用 S/R 指令不受此限制。</div>
+
+    <h3>7.5 输出公共端接线与电压匹配</h3>
+    <p><b>CPU ST20（晶体管输出，DC/DC/DC）：</b></p>
+    <ul>
+      <li>输出类型：晶体管源型输出，输出公共端（1L、2L 等）接 <b>0V</b>。</li>
+      <li>负载电压：24V DC。</li>
+      <li>每点额定电流：0.5A，所有输出点总电流有限制。</li>
+      <li>不能直接驱动 220V AC 负载。</li>
+    </ul>
+    <p><b>CPU SR20（继电器输出，AC/DC/Relay）：</b></p>
+    <ul>
+      <li>输出类型：继电器触点，可接 24V DC 或 220V AC。</li>
+      <li>每点额定电流：2A。</li>
+      <li>输出公共端根据负载类型选择接 24V DC 或 220V AC 的 L/N。</li>
+    </ul>
+    <div class="warn"><b>注意事项：</b>若使用 SR20 接 220V AC 指示灯，务必做好绝缘防护，并确保输出公共端接线正确。ST20 晶体管输出有漏电流（约 10μA），极低功率的 LED 指示灯可能微弱发光，可并联假负载电阻解决。</div>
+  </div>
+
+  <div class="card">
+    <h2>八、验收测试记录表</h2>
+    <table>
+      <tr><th>序号</th><th>操作</th><th>预期现象</th><th>实际观察</th><th>结论</th></tr>
+      <tr><td>1</td><td>上电（PLC 进入 RUN），不按任何按钮</td><td>8 个灯全部熄灭</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+      <tr><td>2</td><td>按 SB3 后松开</td><td>仅 HL3 常亮，其余 7 灯灭</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+      <tr><td>3</td><td>在 HL3 亮时按 SB7 后松开</td><td>HL3 灭，HL7 亮，其余 6 灯灭</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+      <tr><td>4</td><td>按住 SB1~SB8 任意顺序反复按（快速轮按）</td><td>任何时刻只有 1 个灯亮</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+      <tr><td>5</td><td>在任意灯亮时按 SB0</td><td>8 个灯全部熄灭</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+      <tr><td>6</td><td>按 SB0 后再按 SB1</td><td>仅 HL1 亮</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+      <tr><td>7</td><td>上电后立即按住 SB5，观察上电瞬间</td><td>上电瞬间灯全灭，然后 HL5 亮</td><td><input type="text" placeholder="填写…"></td><td>□合格 □不合格</td></tr>
+    </table>
+    <p style="font-size:.83rem;color:var(--muted)">
+      测试 1 验证上电初始化；测试 2 验证单灯保持；测试 3 验证互锁；测试 4 验证任意时刻只有 1 灯亮；
+      测试 5 验证复位；测试 6 验证复位后重新开始；测试 7 验证上电初始化与按钮操作的时序关系。
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>九、思考题</h2>
+
+    <h3>思考题 1：如何改为"按住才亮，松开即灭"？</h3>
+    <p>将程序中的 S（置位）指令改为 <code>=</code> 输出线圈即可。例如方案 A 中 Network 2 改为：</p>
+    <pre>  I0.0
+──┤ ├────────────────────( ) Q0.0</pre>
+    <p>此时 Q0.0 直接由 I0.0 驱动，按下亮、松开灭。但需注意互锁逻辑：如果 Q0.0~Q0.7 均由各自的 I 点直接驱动，多个按钮同时按下时会有多个灯同时亮。如需保持互锁，可在每个输出支路串联其他 7 个按钮的常闭触点；或者保留 S/R 方案，在末端用 I 点的常闭触点复位。</p>
+
+    <h3>思考题 2：如何改为按 1~8 逐个累积点亮？</h3>
+    <p>将复位操作去掉即可。方案 B 中，将每个网络的 MOV_B 改为：读取当前 QB0 的值，与对应数值进行"或"运算后写回：</p>
+    <pre>  I0.1
+──┤ ├──────[ MOV_B ]  IN: QB0, OUT: MB0      // 读当前值
+           [ OR_B  ]  IN1: MB0, IN2: 2, OUT: MB0   // 与 2 做或运算
+           [ MOV_B ]  IN: MB0, OUT: QB0      // 写回</pre>
+    <p>或者直接用 S 指令（不加 R）：按下 SBn 时只 <code>S Q0.n, 1</code>，不执行任何 R 操作。这样每次按下新按钮，新灯亮，旧灯保持亮。SB0 用于全部复位。</p>
+
+    <h3>思考题 3：如何用 3 个输入按钮编码表示 8 个数字？</h3>
+    <p>使用 3 个按钮作为二进制输入的 3 位，分别代表 1、2、4 的权重。将 3 个输入组合成 3 位二进制数（000~111），通过译码得到 8 个数字。具体实现：</p>
+    <pre>// 将 I0.0~I0.2 组合为 3 位二进制值
+LD     I0.0
+MOVB   1, MB0
+LD     I0.1
+MOVB   2, MB1
+LD     I0.2
+MOVB   4, MB2</pre>
+    <p>更简洁的方法是用加法指令：先将 MB0 清零，然后依次判断 I0.0/I0.1/I0.2，为 ON 时给 MB0 加上 1/2/4。最后将 MB0 的值通过查表或 MOV 指令映射到 QB0。</p>
+
+    <h3>思考题 4：如何加入数码管显示当前数字？</h3>
+    <p>本实验的 8 个输出对应 8 个灯，如果要加入七段数码管显示数字 1~8，需要额外的 4 个输出点（Q1.0~Q1.3）输出 BCD 码，连接到 BCD-七段译码器（如 74LS47/74LS48），译码器驱动数码管显示对应数字。程序需要在按下 SBn 时，同时将对应的 BCD 码（1~8）写入 Q1.0~Q1.3。可以使用比较指令或查表法实现：</p>
+    <pre>LD     I0.0
+MOVB   1, QB1          // 数码管显示 1
+LD     I0.1
+MOVB   2, QB1          // 数码管显示 2
+...</pre>
+    <p>这样，8 个 LED 灯和数码管可以同时显示当前数字，形成双重指示效果。</p>
+  </div>
+
+  <div class="card" style="text-align:center;color:var(--muted);font-size:.82rem">
+    本文档基于 S7-200 SMART + STEP 7-Micro/WIN SMART V2.8 编写，所有指令均可在该平台中实际运行。
+  </div>
+
+</div>
+
+<script>
+/* ================= Tab 切换 ================= */
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    const t = btn.dataset.tab;
+    document.getElementById('tab-sim').classList.toggle('hidden', t!=='sim');
+    document.getElementById('tab-doc').classList.toggle('hidden', t!=='doc');
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+});
+
+/* ================= 仿真状态 ================= */
+const state = {
+  mode: 'A',
+  outputs: new Array(8).fill(0),   // Q0.0 ~ Q0.7
+  activeNet: null,
+  lastAction: '—'
+};
+
+/* ---------- 构建按钮区 ---------- */
+const btnGrid = document.getElementById('btnGrid');
+for(let i=1;i<=8;i++){
+  const d = document.createElement('div');
+  d.className='pbtn';
+  d.dataset.n = i;
+  d.innerHTML = `<div class="lbl">SB${i}</div><div class="addr">I0.${i-1}</div>`;
+  d.addEventListener('pointerdown',()=>{ d.classList.add('pressed'); pressButton(i); });
+  d.addEventListener('pointerup',()=>d.classList.remove('pressed'));
+  d.addEventListener('pointerleave',()=>d.classList.remove('pressed'));
+  btnGrid.appendChild(d);
+}
+const btnReset = document.getElementById('btnReset');
+btnReset.addEventListener('pointerdown',()=>{ btnReset.classList.add('pressed'); pressButton(0); });
+btnReset.addEventListener('pointerup',()=>btnReset.classList.remove('pressed'));
+btnReset.addEventListener('pointerleave',()=>btnReset.classList.remove('pressed'));
+
+/* ---------- 构建灯区 ---------- */
+const lampGrid = document.getElementById('lampGrid');
+for(let i=0;i<8;i++){
+  const box = document.createElement('div');
+  box.className='lamp-box';
+  box.innerHTML = `<div class="lamp" id="lamp${i}"></div>
+                   <div class="lamp-cap"><b>HL${i+1}</b><br>Q0.${i}</div>`;
+  lampGrid.appendChild(box);
+}
+
+/* ---------- 构建位状态 ---------- */
+const bitRow = document.getElementById('bitRow');
+for(let i=7;i>=0;i--){
+  const b = document.createElement('div');
+  b.className='bit'; b.id='bit'+i;
+  b.innerHTML = `<b>Q0.${i}</b>`;
+  bitRow.appendChild(b);
+}
+
+/* ---------- 核心：按下按钮 ---------- */
+function pressButton(n){
+  if(n===0){
+    // SB0 复位
+    state.outputs = new Array(8).fill(0);
+    state.activeNet = 'N10';
+    state.lastAction = 'SB0 复位 → QB0 = 0';
+  }else{
+    // 先全部复位，再置位第 n 位（模拟互锁）
+    state.outputs = new Array(8).fill(0);
+    state.outputs[n-1] = 1;
+    state.activeNet = 'N' + (n+1);
+    const val = Math.pow(2, n-1);
+    state.lastAction = `SB${n} 按下 → QB0 = ${val}`;
+  }
+  render();
+}
+
+/* ---------- 上电复位 ---------- */
+document.getElementById('powerReset').addEventListener('click',()=>{
+  state.outputs = new Array(8).fill(0);
+  state.activeNet = 'N1';
+  state.lastAction = '上电初始化 (SM0.1) → QB0 = 0';
+  render();
+  setTimeout(()=>{ state.activeNet = null; render(); }, 900);
+});
+
+/* ---------- 清空记录 ---------- */
+document.getElementById('clearLog').addEventListener('click',()=>{
+  state.lastAction = '—';
+  state.activeNet = null;
+  render();
+});
+
+/* ---------- 方案切换 ---------- */
+document.querySelectorAll('#modeSeg button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#modeSeg button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on');
+    state.mode = b.dataset.mode;
+    document.getElementById('modeText').textContent = state.mode==='A' ? '方案 A' : '方案 B';
+    buildLadder();
+    render();
+  });
+});
+
+/* ---------- 渲染 ---------- */
+function render(){
+  // 灯
+  state.outputs.forEach((v,i)=>{
+    document.getElementById('lamp'+i).classList.toggle('on', v===1);
+  });
+  // QB0 值
+  let qb = 0;
+  state.outputs.forEach((v,i)=>{ if(v) qb += Math.pow(2,i); });
+  document.getElementById('qbVal').textContent = qb;
+  const bin = qb.toString(2).padStart(8,'0');
+  document.getElementById('qbBin').textContent = bin.slice(0,4) + ' ' + bin.slice(4);
+  // 位状态
+  for(let i=0;i<8;i++){
+    document.getElementById('bit'+i).classList.toggle('on', state.outputs[i]===1);
+  }
+  // 最近动作
+  document.getElementById('lastAction').textContent = state.lastAction;
+  // 梯形图高亮
+  document.querySelectorAll('.net').forEach(el=>{
+    el.classList.toggle('active', el.dataset.net === state.activeNet);
+  });
+}
+
+/* ---------- 构建梯形图监视 ---------- */
+function buildLadder(){
+  const box = document.getElementById('ladderList');
+  let html = '';
+
+  // Network 1
+  html += `<div class="net" data-net="N1">
+    <div class="net-title">Network 1　上电初始化（首次扫描 SM0.1）</div>
+    <pre>  SM0.1
+──┤ ├────────────────────[ R  QB0, 8 ]</pre>
+  </div>`;
+
+  // Network 2~9
+  for(let i=1;i<=8;i++){
+    const netNum = i+1;
+    let pre;
+    if(state.mode==='A'){
+      pre = `  I0.${i-1}
+──┤ ├──────┬────────────[ R  QB0, 8 ]
+           └────────────[ S  Q0.${i-1}, 1 ]`;
+    }else{
+      const v = Math.pow(2,i-1);
+      pre = `  I0.${i-1}
+──┤ ├────────────────────[ MOV_B ]
+                       IN  : ${v}
+                       OUT : QB0`;
+    }
+    html += `<div class="net" data-net="N${netNum}">
+      <div class="net-title">Network ${netNum}　按下 SB${i} → 仅 HL${i} 亮</div>
+      <pre>${pre}</pre>
+    </div>`;
+  }
+
+  // Network 10
+  const net10 = state.mode==='A'
+    ? `  I1.0
+──┤ ├────────────────────[ R  QB0, 8 ]`
+    : `  I1.0
+──┤ ├────────────────────[ MOV_B ]
+                       IN  : 0
+                       OUT : QB0`;
+  html += `<div class="net" data-net="N10">
+    <div class="net-title">Network 10　按下 SB0 → 全部熄灭</div>
+    <pre>${net10}</pre>
+  </div>`;
+
+  box.innerHTML = html;
+}
+
+/* ---------- 初始化 ---------- */
+buildLadder();
+render();
+</script>
+</body>
+</html>
